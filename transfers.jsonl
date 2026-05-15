@@ -1,0 +1,1 @@
+{"id": 1, "timestamp": "2024-01-01T10:00:00", "event_type": "moved", "src_path": "/home/user/docs/secret.pdf", "dest_path": "/media/usb/", "severity": "CRITICAL", "file_hash": "abc123", "integrity_status": "OK", "sensitive": true, "suspicious_dest": true, "alert_message": "CRITICAL: Sensitive file moved to USB"}

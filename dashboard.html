@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SFMS — Secure File Transfer Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #050810;
+    --panel:     #0b0f1a;
+    --border:    #1a2340;
+    --accent:    #00e5ff;
+    --accent2:   #7b2fff;
+    --green:     #00ff88;
+    --red:       #ff3366;
+    --orange:    #ff8c00;
+    --yellow:    #ffd700;
+    --text:      #c8d8f0;
+    --muted:     #4a5a7a;
+    --mono:      'Share Tech Mono', monospace;
+    --sans:      'Syne', sans-serif;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* grid bg */
+  body::before {
+    content:'';
+    position:fixed; inset:0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events:none; z-index:0;
+  }
+
+  /* ── Header ── */
+  header {
+    position: sticky; top:0; z-index:100;
+    background: rgba(5,8,16,0.95);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+    padding: 0 2rem;
+    display: flex; align-items:center; justify-content:space-between;
+    height: 64px;
+  }
+  .logo {
+    display:flex; align-items:center; gap:.75rem;
+  }
+  .logo-icon {
+    width:36px; height:36px;
+    border: 2px solid var(--accent);
+    border-radius:8px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:1.1rem;
+    box-shadow: 0 0 16px rgba(0,229,255,0.3);
+    animation: pulse-border 3s ease-in-out infinite;
+  }
+  @keyframes pulse-border {
+    0%,100% { box-shadow: 0 0 16px rgba(0,229,255,0.3); }
+    50%      { box-shadow: 0 0 32px rgba(0,229,255,0.6); }
+  }
+  .logo-text { font-weight:800; font-size:1.1rem; letter-spacing:.05em; }
+  .logo-text span { color: var(--accent); }
+
+  .header-right { display:flex; align-items:center; gap:1rem; }
+
+  .status-pill {
+    display:flex; align-items:center; gap:.5rem;
+    padding:.35rem .9rem;
+    border-radius:999px;
+    font-family: var(--mono); font-size:.75rem;
+    border: 1px solid;
+    transition: all .3s;
+  }
+  .status-pill.active   { border-color:var(--green); color:var(--green); background:rgba(0,255,136,0.08); }
+  .status-pill.inactive { border-color:var(--muted); color:var(--muted); background:transparent; }
+  .dot {
+    width:7px; height:7px; border-radius:50%;
+    background: currentColor;
+  }
+  .dot.blink { animation: blink 1.2s ease-in-out infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+  /* ── Layout ── */
+  main { position:relative; z-index:1; padding:2rem; max-width:1400px; margin:0 auto; }
+
+  /* ── Stat Cards ── */
+  .stats-grid {
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap:1rem; margin-bottom:2rem;
+  }
+  .stat-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius:12px;
+    padding:1.25rem 1.5rem;
+    position:relative; overflow:hidden;
+    transition: border-color .3s;
+  }
+  .stat-card::before {
+    content:''; position:absolute;
+    top:0; left:0; right:0; height:2px;
+  }
+  .stat-card.cyan::before   { background: var(--accent); }
+  .stat-card.purple::before { background: var(--accent2); }
+  .stat-card.red::before    { background: var(--red); }
+  .stat-card.orange::before { background: var(--orange); }
+  .stat-card:hover { border-color:rgba(0,229,255,0.3); }
+
+  .stat-label {
+    font-family:var(--mono); font-size:.7rem;
+    color:var(--muted); text-transform:uppercase; letter-spacing:.1em;
+    margin-bottom:.5rem;
+  }
+  .stat-value {
+    font-size:2.2rem; font-weight:800;
+    line-height:1;
+  }
+  .stat-card.cyan .stat-value   { color: var(--accent); }
+  .stat-card.purple .stat-value { color: var(--accent2); }
+  .stat-card.red .stat-value    { color: var(--red); }
+  .stat-card.orange .stat-value { color: var(--orange); }
+  .stat-sub { font-size:.75rem; color:var(--muted); margin-top:.4rem; }
+
+  /* ── Panels ── */
+  .panels { display:grid; grid-template-columns:1fr 380px; gap:1.5rem; }
+  @media(max-width:900px){ .panels{grid-template-columns:1fr;} }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius:12px;
+    overflow:hidden;
+  }
+  .panel-header {
+    padding:.9rem 1.5rem;
+    border-bottom:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .panel-title {
+    font-weight:700; font-size:.9rem;
+    display:flex; align-items:center; gap:.6rem;
+  }
+  .panel-title .icon { font-size:1rem; }
+
+  .panel-actions { display:flex; gap:.5rem; }
+
+  /* ── Filter Pills ── */
+  .filters { display:flex; gap:.5rem; flex-wrap:wrap; }
+  .filter-btn {
+    padding:.25rem .75rem;
+    border-radius:999px;
+    border:1px solid var(--border);
+    background:transparent;
+    color:var(--muted);
+    font-family:var(--mono); font-size:.7rem;
+    cursor:pointer; transition:all .2s;
+  }
+  .filter-btn.active, .filter-btn:hover { border-color:var(--accent); color:var(--accent); }
+  .filter-btn.critical.active { border-color:var(--red); color:var(--red); }
+  .filter-btn.high.active     { border-color:var(--orange); color:var(--orange); }
+  .filter-btn.medium.active   { border-color:var(--yellow); color:var(--yellow); }
+
+  /* ── Event Log Table ── */
+  .table-wrap { overflow-x:auto; max-height:480px; overflow-y:auto; }
+  .table-wrap::-webkit-scrollbar { width:4px; height:4px; }
+  .table-wrap::-webkit-scrollbar-track { background:var(--bg); }
+  .table-wrap::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+  table { width:100%; border-collapse:collapse; }
+  thead th {
+    padding:.6rem 1rem;
+    font-family:var(--mono); font-size:.68rem;
+    text-transform:uppercase; letter-spacing:.08em;
+    color:var(--muted);
+    text-align:left;
+    background:var(--bg);
+    position:sticky; top:0; z-index:2;
+    border-bottom:1px solid var(--border);
+  }
+  tbody tr {
+    border-bottom:1px solid rgba(26,35,64,.5);
+    transition:background .15s;
+  }
+  tbody tr:hover { background:rgba(0,229,255,0.03); }
+  tbody td {
+    padding:.55rem 1rem;
+    font-family:var(--mono); font-size:.72rem;
+    color:var(--text);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    max-width:200px;
+  }
+
+  .badge {
+    display:inline-block;
+    padding:.15rem .5rem;
+    border-radius:4px;
+    font-size:.65rem; font-weight:700;
+    letter-spacing:.05em;
+  }
+  .badge-CRITICAL { background:rgba(255,51,102,.15); color:var(--red);    border:1px solid rgba(255,51,102,.3); }
+  .badge-HIGH     { background:rgba(255,140,0,.15);  color:var(--orange); border:1px solid rgba(255,140,0,.3); }
+  .badge-MEDIUM   { background:rgba(255,215,0,.1);   color:var(--yellow); border:1px solid rgba(255,215,0,.25); }
+  .badge-LOW      { background:rgba(0,255,136,.08);  color:var(--green);  border:1px solid rgba(0,255,136,.2); }
+
+  .evt-created  { color:var(--green); }
+  .evt-modified { color:var(--yellow); }
+  .evt-deleted  { color:var(--red); }
+  .evt-moved    { color:var(--accent); }
+
+  .hash-cell {
+    font-family:var(--mono); font-size:.65rem;
+    color:var(--muted);
+    max-width:100px !important;
+  }
+  .integrity-ok       { color:var(--green); }
+  .integrity-mismatch { color:var(--red); font-weight:700; }
+  .integrity-na       { color:var(--muted); }
+
+  /* ── Alert Feed ── */
+  .alert-feed { max-height:480px; overflow-y:auto; }
+  .alert-feed::-webkit-scrollbar { width:3px; }
+  .alert-feed::-webkit-scrollbar-thumb { background:var(--border); }
+
+  .alert-item {
+    padding:1rem 1.25rem;
+    border-bottom:1px solid rgba(26,35,64,.5);
+    display:flex; gap:.75rem; align-items:flex-start;
+    animation:slide-in .3s ease;
+  }
+  @keyframes slide-in {
+    from { opacity:0; transform:translateX(10px); }
+    to   { opacity:1; transform:translateX(0); }
+  }
+  .alert-dot {
+    width:8px; height:8px; border-radius:50%;
+    margin-top:.3rem; flex-shrink:0;
+  }
+  .alert-CRITICAL .alert-dot { background:var(--red);    box-shadow:0 0 8px var(--red); }
+  .alert-HIGH     .alert-dot { background:var(--orange);  box-shadow:0 0 8px var(--orange); }
+  .alert-MEDIUM   .alert-dot { background:var(--yellow); }
+  .alert-body { flex:1; min-width:0; }
+  .alert-msg  { font-size:.8rem; color:var(--text); line-height:1.4; }
+  .alert-time { font-family:var(--mono); font-size:.65rem; color:var(--muted); margin-top:.25rem; }
+
+  .no-alerts {
+    padding:3rem 1.5rem;
+    text-align:center;
+    color:var(--muted);
+    font-family:var(--mono); font-size:.8rem;
+  }
+  .no-alerts .icon { font-size:2rem; display:block; margin-bottom:.75rem; opacity:.4; }
+
+  /* ── Buttons ── */
+  .btn {
+    padding:.5rem 1.25rem;
+    border-radius:8px;
+    border:1px solid;
+    font-family:var(--sans); font-size:.8rem; font-weight:600;
+    cursor:pointer; transition:all .2s;
+    display:inline-flex; align-items:center; gap:.4rem;
+  }
+  .btn-start {
+    border-color:var(--green); color:var(--green);
+    background:rgba(0,255,136,.08);
+  }
+  .btn-start:hover { background:rgba(0,255,136,.18); box-shadow:0 0 16px rgba(0,255,136,.2); }
+  .btn-stop {
+    border-color:var(--red); color:var(--red);
+    background:rgba(255,51,102,.08);
+  }
+  .btn-stop:hover { background:rgba(255,51,102,.18); }
+  .btn-export {
+    border-color:var(--accent); color:var(--accent);
+    background:rgba(0,229,255,.06);
+  }
+  .btn-export:hover { background:rgba(0,229,255,.14); }
+  .btn-clear {
+    border-color:var(--muted); color:var(--muted);
+    background:transparent; font-size:.75rem; padding:.4rem .9rem;
+  }
+  .btn-clear:hover { border-color:var(--text); color:var(--text); }
+  .btn:disabled { opacity:.4; cursor:not-allowed; }
+
+  /* ── Control bar ── */
+  .controls {
+    display:flex; align-items:center; gap:1rem;
+    margin-bottom:2rem; flex-wrap:wrap;
+  }
+
+  /* ── Watched dirs ── */
+  .watch-dirs {
+    font-family:var(--mono); font-size:.72rem;
+    color:var(--muted);
+    padding:.5rem 1rem;
+    background:var(--bg);
+    border-radius:6px;
+    border:1px solid var(--border);
+  }
+
+  /* ── Toast ── */
+  #toast {
+    position:fixed; bottom:1.5rem; right:1.5rem; z-index:999;
+    background:var(--panel);
+    border:1px solid var(--accent);
+    border-radius:10px;
+    padding:.75rem 1.25rem;
+    font-family:var(--mono); font-size:.8rem;
+    color:var(--accent);
+    transform:translateY(80px); opacity:0;
+    transition:all .3s ease;
+    box-shadow: 0 0 20px rgba(0,229,255,.15);
+  }
+  #toast.show { transform:translateY(0); opacity:1; }
+
+  /* ── Uptime ── */
+  #uptime { font-family:var(--mono); font-size:.75rem; color:var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🛡</div>
+    <div class="logo-text"><span>SFMS</span> · Secure File Monitor</div>
+  </div>
+  <div class="header-right">
+    <span id="uptime">--:--:--</span>
+    <div class="status-pill inactive" id="status-pill">
+      <span class="dot" id="status-dot"></span>
+      <span id="status-text">OFFLINE</span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="btn btn-start" id="btn-start" onclick="startMonitor()">▶ Start Monitoring</button>
+    <button class="btn btn-stop"  id="btn-stop"  onclick="stopMonitor()" disabled>⏹ Stop</button>
+    <button class="btn btn-export" onclick="exportCSV()">↓ Export CSV</button>
+    <button class="btn btn-export" onclick="exportJSON()" style="border-color:var(--accent2);color:var(--accent2);background:rgba(123,47,255,.06)">↓ Export JSON</button>
+    <div class="watch-dirs" id="watch-dirs">Watched: —</div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card cyan">
+      <div class="stat-label">Total Events</div>
+      <div class="stat-value" id="s-total">0</div>
+      <div class="stat-sub">since monitor start</div>
+    </div>
+    <div class="stat-card red">
+      <div class="stat-label">Alerts</div>
+      <div class="stat-value" id="s-alerts">0</div>
+      <div class="stat-sub">HIGH + CRITICAL</div>
+    </div>
+    <div class="stat-card orange">
+      <div class="stat-label">Integrity Failures</div>
+      <div class="stat-value" id="s-integrity">0</div>
+      <div class="stat-sub">hash mismatches</div>
+    </div>
+    <div class="stat-card purple">
+      <div class="stat-label">Status</div>
+      <div class="stat-value" style="font-size:1.2rem;margin-top:.4rem" id="s-status">OFFLINE</div>
+      <div class="stat-sub">monitoring engine</div>
+    </div>
+  </div>
+
+  <!-- Main panels -->
+  <div class="panels">
+
+    <!-- Event Log -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">📋</span> Live Event Log</div>
+        <div class="panel-actions">
+          <div class="filters">
+            <button class="filter-btn active" onclick="setFilter('ALL',this)">All</button>
+            <button class="filter-btn critical" onclick="setFilter('CRITICAL',this)">Critical</button>
+            <button class="filter-btn high"     onclick="setFilter('HIGH',this)">High</button>
+            <button class="filter-btn medium"   onclick="setFilter('MEDIUM',this)">Medium</button>
+            <button class="filter-btn"          onclick="setFilter('LOW',this)">Low</button>
+          </div>
+          <button class="btn btn-clear" onclick="clearData()">Clear</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Event</th>
+              <th>Severity</th>
+              <th>File</th>
+              <th>Hash (SHA256)</th>
+              <th>Integrity</th>
+            </tr>
+          </thead>
+          <tbody id="events-tbody">
+            <tr><td colspan="6" style="text-align:center;padding:3rem;color:var(--muted);font-family:var(--mono);font-size:.8rem">
+              ▶ Start monitoring to see live events
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Alert Feed -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">🚨</span> Alert Feed</div>
+        <span style="font-family:var(--mono);font-size:.7rem;color:var(--muted)" id="alert-count">0 alerts</span>
+      </div>
+      <div class="alert-feed" id="alert-feed">
+        <div class="no-alerts">
+          <span class="icon">🔕</span>
+          No alerts yet.<br>Suspicious activity will appear here.
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+let currentFilter = 'ALL';
+let pollInterval  = null;
+let uptimeInterval = null;
+let startTime = null;
+
+// ── API helpers ─────────────────────────────────────────────────────────────
+
+async function api(path, method='GET') {
+  const r = await fetch(path, { method });
+  return r.json();
+}
+
+// ── Monitor controls ─────────────────────────────────────────────────────────
+
+async function startMonitor() {
+  const r = await api('/api/monitor/start', 'POST');
+  toast('✓ Monitoring started');
+  document.getElementById('btn-start').disabled = true;
+  document.getElementById('btn-stop').disabled  = false;
+  startPolling();
+  startUptimeClock();
+}
+
+async function stopMonitor() {
+  await api('/api/monitor/stop', 'POST');
+  toast('⏹ Monitoring stopped');
+  document.getElementById('btn-start').disabled = false;
+  document.getElementById('btn-stop').disabled  = true;
+  stopPolling();
+}
+
+async function clearData() {
+  await api('/api/clear', 'POST');
+  document.getElementById('events-tbody').innerHTML =
+    '<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--muted);font-family:var(--mono);font-size:.8rem">Cleared.</td></tr>';
+  document.getElementById('alert-feed').innerHTML =
+    '<div class="no-alerts"><span class="icon">🔕</span>No alerts.</div>';
+  toast('🗑 Data cleared');
+}
+
+// ── Polling ──────────────────────────────────────────────────────────────────
+
+function startPolling() {
+  if (pollInterval) clearInterval(pollInterval);
+  poll();
+  pollInterval = setInterval(poll, 2000);
+}
+function stopPolling() {
+  if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+}
+
+async function poll() {
+  try {
+    const [statsData, eventsData, alertsData] = await Promise.all([
+      api('/api/stats'),
+      api(`/api/events?severity=${currentFilter}&limit=150`),
+      api('/api/alerts?limit=40')
+    ]);
+    updateStats(statsData);
+    updateEvents(eventsData);
+    updateAlerts(alertsData);
+  } catch(e) { /* server may not be ready yet */ }
+}
+
+// ── Render Stats ─────────────────────────────────────────────────────────────
+
+function updateStats(d) {
+  document.getElementById('s-total').textContent     = d.total_events || 0;
+  document.getElementById('s-alerts').textContent    = d.alerts || 0;
+  document.getElementById('s-integrity').textContent = d.integrity_failures || 0;
+
+  const active = d.monitoring;
+  document.getElementById('s-status').textContent = active ? 'ACTIVE' : 'OFFLINE';
+  document.getElementById('s-status').style.color = active ? 'var(--green)' : 'var(--red)';
+
+  const pill = document.getElementById('status-pill');
+  const dot  = document.getElementById('status-dot');
+  const txt  = document.getElementById('status-text');
+  if (active) {
+    pill.className='status-pill active'; dot.classList.add('blink'); txt.textContent='LIVE';
+  } else {
+    pill.className='status-pill inactive'; dot.classList.remove('blink'); txt.textContent='OFFLINE';
+  }
+
+  if (d.watched_dirs) {
+    document.getElementById('watch-dirs').textContent =
+      'Watching: ' + d.watched_dirs.map(p => p.split('/').pop() || p.split('\\').pop()).join(', ');
+  }
+}
+
+// ── Render Events ─────────────────────────────────────────────────────────────
+
+function updateEvents(events) {
+  if (!events.length) return;
+  const tbody = document.getElementById('events-tbody');
+  tbody.innerHTML = events.map(e => {
+    const t = new Date(e.timestamp).toLocaleTimeString();
+    const fname = (e.src_path || '').split(/[/\\]/).pop() || e.src_path;
+    const hash  = e.file_hash ? e.file_hash.substring(0,12)+'…' : '—';
+    const intCls = e.integrity_status === 'MISMATCH' ? 'integrity-mismatch'
+                 : e.integrity_status === 'OK'       ? 'integrity-ok' : 'integrity-na';
+    const intTxt = e.integrity_status || '—';
+    return `<tr>
+      <td>${t}</td>
+      <td class="evt-${e.event_type}">${e.event_type?.toUpperCase()}</td>
+      <td><span class="badge badge-${e.severity}">${e.severity}</span></td>
+      <td title="${e.src_path}">${fname}</td>
+      <td class="hash-cell" title="${e.file_hash||''}">${hash}</td>
+      <td class="${intCls}">${intTxt}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Render Alerts ─────────────────────────────────────────────────────────────
+
+function updateAlerts(alerts) {
+  document.getElementById('alert-count').textContent = alerts.length + ' alert' + (alerts.length!==1?'s':'');
+  if (!alerts.length) {
+    document.getElementById('alert-feed').innerHTML =
+      '<div class="no-alerts"><span class="icon">🔕</span>No alerts yet.</div>';
+    return;
+  }
+  document.getElementById('alert-feed').innerHTML = alerts.map(a => {
+    const t = new Date(a.timestamp).toLocaleTimeString();
+    return `<div class="alert-item alert-${a.severity}">
+      <div class="alert-dot"></div>
+      <div class="alert-body">
+        <div class="alert-msg">${a.alert_message || a.event_type}</div>
+        <div class="alert-time">${t} · ${(a.src_path||'').split(/[/\\]/).pop()}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Filter ───────────────────────────────────────────────────────────────────
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  poll();
+}
+
+// ── Export ───────────────────────────────────────────────────────────────────
+
+function exportCSV()  { window.location.href='/api/report/csv'; }
+function exportJSON() { window.location.href='/api/report/json'; }
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ── Uptime ───────────────────────────────────────────────────────────────────
+
+function startUptimeClock() {
+  startTime = Date.now();
+  if (uptimeInterval) clearInterval(uptimeInterval);
+  uptimeInterval = setInterval(() => {
+    const s = Math.floor((Date.now() - startTime) / 1000);
+    const h = String(Math.floor(s/3600)).padStart(2,'0');
+    const m = String(Math.floor((s%3600)/60)).padStart(2,'0');
+    const sc= String(s%60).padStart(2,'0');
+    document.getElementById('uptime').textContent = `${h}:${m}:${sc}`;
+  }, 1000);
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+
+(async () => {
+  try {
+    const d = await api('/api/stats');
+    updateStats(d);
+    if (d.monitoring) {
+      document.getElementById('btn-start').disabled = true;
+      document.getElementById('btn-stop').disabled  = false;
+      startPolling(); startUptimeClock();
+    }
+  } catch(e){}
+})();
+</script>
+</body>
+</html>
