@@ -130,4 +130,6 @@ if __name__ == "__main__":
     os.makedirs(os.path.join(os.path.dirname(__file__), "reports"), exist_ok=True)
     print("\n🛡  Secure File Transfer Monitoring System")
     print("   Dashboard → http://127.0.0.1:5000\n")
-    app.run(debug=True, use_reloader=False)
+    #app.run(debug=True, use_reloader=False)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
