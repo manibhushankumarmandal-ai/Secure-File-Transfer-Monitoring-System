@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/27855907/README.md)
 # 🛡 Secure File Transfer Monitoring System (SFMS)
 
 A Python-based file transfer monitoring toolkit with a real-time web dashboard.
